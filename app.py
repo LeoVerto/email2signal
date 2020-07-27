@@ -89,7 +89,7 @@ async def amain(loop: asyncio.AbstractEventLoop):
     except KeyError:
         sys.exit("Please set the required environment variables.")
 
-    print("Starting email2signal-rest server")
+    print("Starting email2signal server")
     email_handler = EmailHandler(config)
     controller = Controller(email_handler, hostname="")
     controller.start()
