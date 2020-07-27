@@ -4,29 +4,42 @@ import json
 import os
 import sys
 
-from aiosmtpd.controller import Controller
+from typing import Dict
 from urllib.parse import urljoin
+
+from aiosmtpd.controller import Controller
+from sendmail import send_mail
 
 
 class EmailHandler:
-    def __init__(self, signal_rest_url: str, sender_number: str):
+    def __init__(self, config: Dict[str, str]):
         self.receiver_regex = re.compile(r"(\+\d+)@signal.localdomain")
         self.subject_regex = re.compile(r"Subject: (.*)\n")
         self.image_regex = re.compile(
             r'Content-Type: image/png; name=".*"\n+((?:[A-Za-z0-9+/]{4}|\n)*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=))'
         )
-
-        self.signal_rest_url = signal_rest_url
-        self.sender_number = sender_number
+        self.config = config
+        self.forward_signal = False
 
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
-        if not re.match(self.receiver_regex, address):
-            return "550 Malformed receiver address"
+        if re.match(self.receiver_regex, address):
+            self.forward_signal = True
+        else:
+            self.forward_signal = False
+
         envelope.rcpt_tos.append(address)
         return "250 OK"
 
     async def handle_DATA(self, server, session, envelope):
-        print(envelope.rcpt_tos)
+        if self.forward_signal:
+            print("Forwarding message to signal")
+            return await self.send_signal(envelope)
+        else:
+            print("Sending email via MTA")
+            return send_mail(self.config["smtp_host"], int(self.config["smtp_port"]), self.config["smtp_user"],
+                      self.config["smtp_passwd"], envelope)
+
+    async def send_signal(self, envelope):
         try:
             receiver_number = re.search(self.receiver_regex, envelope.rcpt_tos[0]).group(1)
         except TypeError:
@@ -38,11 +51,11 @@ class EmailHandler:
         msg = re.search(self.subject_regex, content).group(1)
 
         payload = {
-          "message": msg,
-          "number": self.sender_number,
-          "recipients": [
-            receiver_number
-          ]
+            "message": msg,
+            "number": self.config["sender_number"],
+            "recipients": [
+                receiver_number
+            ]
         }
 
         if match := re.search(self.image_regex, content):
@@ -53,7 +66,7 @@ class EmailHandler:
             'Content-Type': 'application/json'
         }
 
-        url = urljoin(self.signal_rest_url, "v2/send")
+        url = urljoin(self.config["signal_rest_url"], "v2/send")
         response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
 
         if response.status_code == 201:
@@ -64,16 +77,22 @@ class EmailHandler:
 
 def run():
     try:
-        signal_rest_url = os.environ["SIGNAL_REST_URL"]
-        sender_number = os.environ["SENDER_NUMBER"]
+        config = {
+            "signal_rest_url": os.environ["SIGNAL_REST_URL"],
+            "sender_number": os.environ["SENDER_NUMBER"],
+            "smtp_host": os.environ["SMTP_HOST"],
+            "smtp_user": os.environ["SMTP_USER"],
+            "smtp_passwd": os.environ["SMTP_PASSWORD"],
+            "smtp_port": os.getenv("SMTP_PORT", "587")
+        }
     except KeyError:
         sys.exit("Please set the required environment variables.")
 
     print("Starting email2signal-rest server")
-    email_handler = EmailHandler(signal_rest_url, sender_number)
+    email_handler = EmailHandler(config)
     controller = Controller(email_handler)
     controller.start()
-    input("Server started. Press Return to quit.")
+    input("Server started. Press Return to quit.\n")
     controller.stop()
 
 
