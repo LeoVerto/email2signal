@@ -1,3 +1,4 @@
+import asyncio
 import re
 import requests
 import json
@@ -75,7 +76,7 @@ class EmailHandler:
             return "554 Sending signal message has failed"
 
 
-def run():
+async def amain(loop: asyncio.AbstractEventLoop):
     try:
         config = {
             "signal_rest_url": os.environ["SIGNAL_REST_URL"],
@@ -92,9 +93,12 @@ def run():
     email_handler = EmailHandler(config)
     controller = Controller(email_handler, hostname="")
     controller.start()
-    input("Server started. Press Return to quit.\n")
-    controller.stop()
 
 
 if __name__ == "__main__":
-    run()
+    loop = asyncio.get_event_loop()
+    loop.create_task(amain(loop=loop))
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
