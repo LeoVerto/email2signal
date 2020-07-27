@@ -17,7 +17,7 @@ class EmailHandler:
         self.receiver_regex = re.compile(r"(\+\d+)@signal.localdomain")
         self.subject_regex = re.compile(r"Subject: (.*)\n")
         self.image_regex = re.compile(
-            r'Content-Type: image/png; name=".*"\n+((?:[A-Za-z0-9+/]{4}|\n)*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=))'
+            r'Content-Type: image/png; name=".*"\n+((?:[A-Za-z\d+/]{4}|\n)*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?)'
         )
         self.config = config
         self.forward_signal = False
