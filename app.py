@@ -90,7 +90,7 @@ def run():
 
     print("Starting email2signal-rest server")
     email_handler = EmailHandler(config)
-    controller = Controller(email_handler)
+    controller = Controller(email_handler, hostname="")
     controller.start()
     input("Server started. Press Return to quit.\n")
     controller.stop()
