@@ -1,19 +1,25 @@
 # Forward email notifications to signal using signal-cli
 
-This project was built to solve my my use-case of sending Grafana alerts via Signal (see grafana/grafana#14952 for the open issue).
+This project was built to solve my my use case of sending Grafana alerts via Signal (see [grafana/grafana#14952](https://github.com/grafana/grafana/issues/14952) for the open issue).
 
 Currently this just means that a Docker container running a Python app listens on port 8025 for incoming emails, extracts the
 subject and the first image (if it exists), and finally utilizes another container running signal-cli ([bbernhard/signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api))
-to send a message to a signal number as specified in the receiver address.
+to send a message to a signal number set in the receiver address.
 
-If the receiver address does not contain a valid phone number, the email is then instead forwarded using an external SMTP server.
+If the receiver address does not follow the format as specified below, the email is instead forwarded using an external SMTP server.
 
 ## Setup
 ### DANGER
-If you run this compose file witht the "ports" section uncommented on a server directly connected to the internet,
+If you run this service with port 8025 exposed on a server directly connected to the internet,
 you will be running an open SMTP relay and bad actors ***will*** use it to send spam emails.
 
-Either only send emails from other docker containers or run the server in a network behind a firewall if you don't want your IP to be blacklisted.
+If you only send emails from other docker containers, remove the commented out
+`ports:` section.
+
+To send messages from local, non-dockerized services, uncomment the lines but make sure
+the `127.0.0.1` remains so the container is only available via localhost.
+
+Otherwise run the server in a network behind a firewall if you don't want your server to be abused and your IP to be blacklisted.
 
 The easiest way to set up this project is by using docker-compose with a compose file based on the following template:
 ```yaml
@@ -32,7 +38,7 @@ services:
     container_name: email2signal
     restart: always
     # ports:
-    #   - 8025:8025
+    #   - 127.0.0.1:8025:8025
     environment:
       - SIGNAL_REST_URL=http://signal-rest:8080
       - SENDER_NUMBER
