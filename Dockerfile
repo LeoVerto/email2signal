@@ -14,5 +14,12 @@ USER app
 
 COPY . .
 
+ENV SIGNAL_REST_URL \
+    SENDER_NUMBER \
+    SMTP_HOST \
+    SMTP_USER \
+    SMTP_PASSWORD \
+    SMTP_PORT=587
+
 EXPOSE 8025
 ENTRYPOINT ["python", "-u", "app.py"]
