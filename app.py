@@ -36,7 +36,7 @@ class EmailHandler:
             print("Forwarding message to signal")
             return await self.send_signal(envelope)
         else:
-            print("Sending email via MTA")
+            print(f"Sending email via MTA. From: {envelope.mail_from} To: {envelope.rcpt_tos}")
             return send_mail(self.config["smtp_host"], int(self.config["smtp_port"]), self.config["smtp_user"],
                       self.config["smtp_passwd"], envelope)
 
