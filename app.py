@@ -9,6 +9,7 @@ from typing import Dict
 from urllib.parse import urljoin
 
 from aiosmtpd.controller import Controller
+from aiosmtpd.smtp import Envelope, Session, SMTP
 from sendmail import send_mail
 
 
@@ -21,7 +22,7 @@ class EmailHandler:
         )
         self.config = config
 
-    async def handle_RCPT(self, server, session, envelope, address, rcpt_options) -> str:
+    async def handle_RCPT(self, server: SMTP, session: Session, envelope: Envelope, address, rcpt_options: list[str]) -> str:
         # match and process signal number
         if match := re.search(self.receiver_regex, address):
             try:
@@ -39,7 +40,7 @@ class EmailHandler:
 
         return "250 OK"
 
-    async def handle_DATA(self, server, session, envelope) -> str:
+    async def handle_DATA(self, server: SMTP, session: Session, envelope: Envelope) -> str:
         signal_numbers = []
         mail_addresses = []
         for addr in envelope.rcpt_tos:
@@ -67,7 +68,8 @@ class EmailHandler:
             return send_mail(self.config["smtp_host"], int(self.config["smtp_port"]), self.config["smtp_user"],
                              self.config["smtp_passwd"], envelope)
 
-    async def send_signal(self, envelope, signal_receivers) -> bool:  # Remove carriage returns, they break the image checking regex
+    async def send_signal(self, envelope: Envelope, signal_receivers: list[str]) -> bool:
+        # Remove carriage returns, they break the image checking regex
         content = envelope.content.decode("utf8").replace("\r", "")
 
         msg = re.search(self.subject_regex, content).group(1)
