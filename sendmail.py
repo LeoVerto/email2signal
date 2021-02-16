@@ -6,11 +6,11 @@ from socket import gaierror
 from aiosmtpd.smtp import Envelope
 
 
-def send_mail(server: str, port: int, user: str, password: str, e: Envelope) -> str:
+def send_mail(host: str, port: int, user: str, password: str, e: Envelope) -> str:
     context = ssl.create_default_context()
 
     try:
-        server = smtplib.SMTP(server, port)
+        server = smtplib.SMTP(host, port)
         server.ehlo()
         server.starttls(context=context)
         server.ehlo()

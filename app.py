@@ -22,7 +22,9 @@ class EmailHandler:
         )
         self.config = config
 
-    async def handle_RCPT(self, server: SMTP, session: Session, envelope: Envelope, address, rcpt_options: list[str]) -> str:
+    async def handle_RCPT(
+        self, server: SMTP, session: Session, envelope: Envelope, address, rcpt_options: list[str]
+    ) -> str:
         # match and process signal number
         if match := re.search(self.receiver_regex, address):
             try:
@@ -65,28 +67,30 @@ class EmailHandler:
             envelope.rcpt_tos = mail_addresses
 
             print(f"Sending email via MTA. From: {envelope.mail_from} To: {envelope.rcpt_tos}")
-            return send_mail(self.config["smtp_host"], int(self.config["smtp_port"]), self.config["smtp_user"],
-                             self.config["smtp_passwd"], envelope)
+            return send_mail(
+                self.config["smtp_host"],
+                int(self.config["smtp_port"]),
+                self.config["smtp_user"],
+                self.config["smtp_passwd"],
+                envelope,
+            )
 
     async def send_signal(self, envelope: Envelope, signal_receivers: list[str]) -> bool:
         # Remove carriage returns, they break the image checking regex
         content = envelope.content.decode("utf8").replace("\r", "")
 
-        msg = re.search(self.subject_regex, content).group(1)
+        if match := re.search(self.subject_regex, content):
+            msg = match.group(1)
+        else:
+            return False
 
-        payload = {
-            "message": msg,
-            "number": self.config["sender_number"],
-            "recipients": signal_receivers
-        }
+        payload = {"message": msg, "number": self.config["sender_number"], "recipients": signal_receivers}
 
         if match := re.search(self.image_regex, content):
             image = match.group(1).replace("\n", "")
             payload["base64_attachments"] = [image]
 
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        headers = {"Content-Type": "application/json"}
 
         url = urljoin(self.config["signal_rest_url"], "v2/send")
         response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
@@ -105,7 +109,7 @@ async def amain(loop: asyncio.AbstractEventLoop):
             "smtp_host": os.environ["SMTP_HOST"],
             "smtp_user": os.environ["SMTP_USER"],
             "smtp_passwd": os.environ["SMTP_PASSWORD"],
-            "smtp_port": os.getenv("SMTP_PORT", "587")
+            "smtp_port": os.getenv("SMTP_PORT", "587"),
         }
     except KeyError:
         sys.exit("Please set the required environment variables.")
