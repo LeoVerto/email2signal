@@ -16,7 +16,7 @@ jobs:
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: leoverto/email2signal
+          images: ${{ github.actor }}/email2signal
           tag-semver: |
             {{version}}
             {{major}}.{{minor}}
