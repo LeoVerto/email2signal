@@ -14,39 +14,60 @@ from sendmail import send_mail
 
 class EmailHandler:
     def __init__(self, config: Dict[str, str]):
-        self.receiver_regex = re.compile(r"(\+\d+)@signal.localdomain")
+        self.receiver_regex = re.compile(r"(\+?\d+)@signal.localdomain")
         self.subject_regex = re.compile(r"Subject: (.*)\n")
         self.image_regex = re.compile(
             r'Content-Type: image/png; name=".*"\n+((?:[A-Za-z\d+/]{4}|\n)*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?)'
         )
         self.config = config
-        self.forward_signal = False
 
-    async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
-        if re.match(self.receiver_regex, address):
-            self.forward_signal = True
+    async def handle_RCPT(self, server, session, envelope, address, rcpt_options) -> str:
+        # match and process signal number
+        if match := re.search(self.receiver_regex, address):
+            try:
+                number = match.group(1)
+            except TypeError:
+                return "500 Malformed receiver address"
+
+            if not address.startswith("+"):
+                number = "+" + number
+
+            envelope.rcpt_tos.append(number)
+        # simply append normal mail address
         else:
-            self.forward_signal = False
+            envelope.rcpt_tos.append(address)
 
-        envelope.rcpt_tos.append(address)
         return "250 OK"
 
-    async def handle_DATA(self, server, session, envelope):
-        if self.forward_signal:
+    async def handle_DATA(self, server, session, envelope) -> str:
+        signal_numbers = []
+        mail_addresses = []
+        for addr in envelope.rcpt_tos:
+            # a real email address cannot start with a special char
+            if addr.startswith("+"):
+                signal_numbers.append(addr)
+            else:
+                mail_addresses.append(addr)
+
+        # send signal message if required
+        if len(signal_numbers) > 0:
             print("Forwarding message to signal")
-            return await self.send_signal(envelope)
+            success = await self.send_signal(envelope, signal_numbers)
+
+            if not success:
+                return "554 Sending signal message has failed"
+
+        # send email if required
+        if len(mail_addresses) == 0:
+            return "250 Message accepted for delivery"
         else:
+            envelope.rcpt_tos = mail_addresses
+
             print(f"Sending email via MTA. From: {envelope.mail_from} To: {envelope.rcpt_tos}")
             return send_mail(self.config["smtp_host"], int(self.config["smtp_port"]), self.config["smtp_user"],
-                      self.config["smtp_passwd"], envelope)
+                             self.config["smtp_passwd"], envelope)
 
-    async def send_signal(self, envelope):
-        try:
-            receiver_number = re.search(self.receiver_regex, envelope.rcpt_tos[0]).group(1)
-        except TypeError:
-            return "500 Malformed receiver address"
-
-        # Remove carriage returns, they break the image checking regex
+    async def send_signal(self, envelope, signal_receivers) -> bool:  # Remove carriage returns, they break the image checking regex
         content = envelope.content.decode("utf8").replace("\r", "")
 
         msg = re.search(self.subject_regex, content).group(1)
@@ -54,9 +75,7 @@ class EmailHandler:
         payload = {
             "message": msg,
             "number": self.config["sender_number"],
-            "recipients": [
-                receiver_number
-            ]
+            "recipients": signal_receivers
         }
 
         if match := re.search(self.image_regex, content):
@@ -71,9 +90,9 @@ class EmailHandler:
         response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
 
         if response.status_code == 201:
-            return "250 Message accepted for delivery"
+            return True
         else:
-            return "554 Sending signal message has failed"
+            return False
 
 
 async def amain(loop: asyncio.AbstractEventLoop):
