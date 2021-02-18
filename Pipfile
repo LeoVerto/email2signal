@@ -7,7 +7,7 @@ verify_ssl = true
 
 [packages]
 requests = "*"
-aiosmtpd = "==1.2.2"
+aiosmtpd = "*"
 
 [requires]
 python_version = "3"
